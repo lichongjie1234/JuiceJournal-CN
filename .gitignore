@@ -1,0 +1,11 @@
+node_modules/
+pnpm-store/
+cache/
+data/
+__pycache__/
+validation/
+assets/
+runtime/
+price-summary.raw.json
+season-list.raw.json
+*.log

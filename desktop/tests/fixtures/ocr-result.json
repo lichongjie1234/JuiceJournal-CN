@@ -1,0 +1,122 @@
+[
+  {
+    "file": "bottom10.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "10",
+        "confidence": 93
+      },
+      {
+        "mode": "8",
+        "text": "10",
+        "confidence": 94
+      },
+      {
+        "mode": "13",
+        "text": "10",
+        "confidence": 94
+      }
+    ]
+  },
+  {
+    "file": "bottom9.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "9",
+        "confidence": 95
+      },
+      {
+        "mode": "8",
+        "text": "9",
+        "confidence": 37
+      },
+      {
+        "mode": "13",
+        "text": "9",
+        "confidence": 37
+      }
+    ]
+  },
+  {
+    "file": "gem7.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "7",
+        "confidence": 53
+      },
+      {
+        "mode": "8",
+        "text": "7",
+        "confidence": 23
+      },
+      {
+        "mode": "13",
+        "text": "7",
+        "confidence": 23
+      }
+    ]
+  },
+  {
+    "file": "scroll5.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "",
+        "confidence": 0
+      },
+      {
+        "mode": "8",
+        "text": "3",
+        "confidence": 36
+      },
+      {
+        "mode": "13",
+        "text": "3",
+        "confidence": 36
+      }
+    ]
+  },
+  {
+    "file": "top14.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "14",
+        "confidence": 0
+      },
+      {
+        "mode": "8",
+        "text": "14",
+        "confidence": 34
+      },
+      {
+        "mode": "13",
+        "text": "14",
+        "confidence": 34
+      }
+    ]
+  },
+  {
+    "file": "top20.png",
+    "attempts": [
+      {
+        "mode": "7",
+        "text": "20",
+        "confidence": 0
+      },
+      {
+        "mode": "8",
+        "text": "",
+        "confidence": 0
+      },
+      {
+        "mode": "13",
+        "text": "",
+        "confidence": 0
+      }
+    ]
+  }
+]
