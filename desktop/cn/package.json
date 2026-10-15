@@ -1,0 +1,8 @@
+{
+  "name": "juicejournal-cn-experimental",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": { "start": "electron .", "test": "node --test ../tests/cn-profit.test.js" },
+  "dependencies": { "electron": "^41.3.0", "tesseract.js": "^5.0.3" }
+}
