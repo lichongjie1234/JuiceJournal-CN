@@ -15,13 +15,15 @@ class Ledger {
   get current() {return this.state.sessions.find(s => !s.endedAt);}
   scan(scan, prices, at = Date.now()) {
     if (!scan.validPage || !scan.scope || !scan.season || !scan.imageHash || !scan.screenshot || !scan.allCellsReviewed) throw Error('仓库页或截图尚未验证');
+    if(prices.season&&prices.season!==scan.season)throw Error('行情赛季不一致');
     const quantities = totals(scan.rows);
     let s = this.current;
     if (s && (s.scope !== scan.scope || s.season !== scan.season)) throw Error('统计仓库或赛季不一致');
-    if (s && (s.baseline.imageHash === scan.imageHash || [...new Set([...Object.keys(s.baseline.quantities),...Object.keys(quantities)])].every(id=>(s.baseline.quantities[id]||0)===(quantities[id]||0)))) return {duplicate:true};
+    if (s && [...new Set([...Object.keys(s.baseline.quantities),...Object.keys(quantities)])].every(id=>(s.baseline.quantities[id]||0)===(quantities[id]||0))) return {duplicate:true};
+    if(s&&s.baseline.imageHash===scan.imageHash)return this.correctBaseline(scan);
     const snapshot = {...clone(scan), quantities, at};
     if (!s) {
-      s = {id:randomUUID(), season:scan.season, scope:scan.scope, startedAt:at, pausedMs:0, pausedAt:null, baseline:snapshot, records:[], costs:[], maps:0};
+      s = {id:randomUUID(), season:scan.season, scope:scan.scope, preset:scan.preset, startedAt:at, pausedMs:0, pausedAt:null, baseline:snapshot, records:[], costs:[], maps:0};
       this.state.sessions.push(s); return {started:true};
     }
     if (prices.season !== s.season) throw Error('行情赛季不一致');
@@ -32,17 +34,22 @@ class Ledger {
       const unitE = price && Number.isFinite(price.valueE) && price.valueE > 0 ? price.valueE : null;
       return {id, quantity, unitE, valueE:quantity === 0 ? 0 : unitE == null ? null : quantity * unitE};
     });
-    const record = {id:randomUUID(), at, before:clone(s.baseline), after:snapshot, prices:clone(prices), items,
+    const record = {id:randomUUID(), at, audit:clone(scan.audit), preset:scan.preset, before:clone(s.baseline), after:snapshot, prices:clone(prices), items,
       valueE:items.some(i => i.valueE == null) ? null : items.reduce((sum,i) => sum+i.valueE,0)};
     s.records.push(record); s.baseline = snapshot; return clone(record);
   }
   rebase(scan,prices,at=Date.now()){
+    if(prices.season&&prices.season!==scan.season)throw Error('行情赛季不一致');
     if(!this.current)return this.scan(scan,prices,at);
     const s=this.current;if(!scan.validPage||!scan.allCellsReviewed||scan.scope!==s.scope||scan.season!==s.season||!scan.screenshot||!scan.imageHash)throw Error('更新基线的截图范围或赛季无效');
     const before=clone(s.baseline);s.baseline={...clone(scan),quantities:totals(scan.rows),at};
     s.rebases??=[];s.rebases.push({at,before,after:clone(s.baseline)});return {rebased:true};
   }
   scanFromEmpty(scan,prices,at=Date.now()){
+    if(!scan.validPage||!scan.allCellsReviewed||!scan.scope||!scan.season||!scan.screenshot||!scan.imageHash)throw Error('仓库页或截图尚未验证');
+    if(prices.season&&prices.season!==scan.season||this.current&&(this.current.scope!==scan.scope||this.current.season!==scan.season))throw Error('统计范围或行情赛季不一致');
+    const quantities=totals(scan.rows),baseline=this.current?.baseline;if(baseline&&[...new Set([...Object.keys(baseline.quantities),...Object.keys(quantities)])].every(id=>(baseline.quantities[id]||0)===(quantities[id]||0)))return {duplicate:true};
+    if(baseline&&baseline.imageHash===scan.imageHash)return this.correctBaseline(scan);
     const empty={...clone(scan),cells:[],rows:[],allRows:[],imageHash:'empty:'+randomUUID(),screenshot:scan.screenshot};
     this.rebase(empty,prices,at);return this.scan(scan,prices,at);
   }
@@ -50,9 +57,9 @@ class Ledger {
   editLatestQuantities(changes){
     const s=this.current,r=s?.records.at(-1);if(!r)throw Error('没有可编辑的库存变化');
     if(!Array.isArray(changes)||changes.length!==r.items.length||new Set(changes.map(c=>c.id)).size!==changes.length||changes.some(c=>!r.items.some(i=>i.id===c.id)||!Number.isSafeInteger(c.quantity)))throw Error('只能修改现有物品的整数数量');
-    const next=clone(r);for(const c of changes){const i=next.items.find(i=>i.id===c.id),after=(r.before.quantities[c.id]||0)+c.quantity;if(!Number.isSafeInteger(after)||after<0)throw Error('修改后的背包数量不能小于零');i.quantity=c.quantity;i.valueE=c.quantity===0?0:i.unitE==null?null:c.quantity*i.unitE;next.after.quantities[c.id]=after;}
+    const changedIds=new Set(changes.filter(c=>r.items.find(i=>i.id===c.id).quantity!==c.quantity).map(c=>c.id));const next=clone(r);for(const c of changes){const i=next.items.find(i=>i.id===c.id),after=(r.before.quantities[c.id]||0)+c.quantity;if(!Number.isSafeInteger(after)||after<0)throw Error('修改后的背包数量不能小于零');i.quantity=c.quantity;i.valueE=c.quantity===0?0:i.unitE==null?null:c.quantity*i.unitE;next.after.quantities[c.id]=after;}
     next.valueE=next.items.some(i=>i.valueE==null)?null:next.items.reduce((n,i)=>n+i.valueE,0);next.correctedAt=Date.now();
-    const updateRows=snapshot=>{for(const [id,total]of Object.entries(next.after.quantities)){for(const field of ['rows','allRows','cells']){const rows=(snapshot[field]||[]).filter(c=>c.id===id&&!c.excluded);if(rows.length){rows.forEach((c,i)=>{c.quantity=i?0:total;c.quantityEdited=true;c.quantitySource='手动修正';});}}}snapshot.quantities=clone(next.after.quantities);};
+    const updateRows=snapshot=>{for(const [id,total]of Object.entries(next.after.quantities)){if(!changedIds.has(id))continue;for(const field of ['rows','allRows','cells']){const rows=(snapshot[field]||[]).filter(c=>c.id===id&&!c.excluded);if(rows.length){rows.forEach((c,i)=>{c.quantity=i?0:total;c.quantityEdited=true;c.quantitySource='手动修正';});}else if(field!=='cells'&&total>0){const source=[...(r.before.allRows||r.before.rows||[]),...(r.before.cells||[])].find(c=>c.id===id)||{};(snapshot[field]??=[]).push({id,name:source.name||id,grade:source.grade,kind:source.kind,quantity:total,confirmed:true,quantityEdited:true,quantitySource:'手动修正'});}}}snapshot.quantities=clone(next.after.quantities);};
     updateRows(next.after);if(s.baseline.imageHash===r.after.imageHash)updateRows(s.baseline);
     s.records[s.records.length-1]=next;return clone(next);
   }
@@ -61,9 +68,10 @@ class Ledger {
     const s=this.current;if(!s)throw Error('没有可修正的背包');
     if(!scan.allCellsReviewed||scan.scope!==s.scope||scan.season!==s.season)throw Error('修正背包范围或赛季不一致');
     const quantities=totals(scan.rows),snapshot={...clone(scan),quantities,at:s.baseline.at};delete snapshot.editingBaseline;
-    const last=s.records.at(-1);if(last&&last.after.imageHash===s.baseline.imageHash){const before=last.before.quantities;last.items=[...new Set([...Object.keys(before),...Object.keys(quantities)])].map(id=>{const quantity=(quantities[id]||0)-(before[id]||0),price=last.prices.items.find(p=>p.id===id);const unitE=price&&Number.isFinite(price.valueE)&&price.valueE>0?price.valueE:null;return {id,quantity,unitE,valueE:quantity===0?0:unitE==null?null:quantity*unitE};});last.valueE=last.items.some(i=>i.valueE==null)?null:last.items.reduce((n,i)=>n+i.valueE,0);last.after=snapshot;}
-    s.baseline=snapshot;return {corrected:true};
+    const last=s.records.at(-1),matches=last&&last.after.imageHash===s.baseline.imageHash;if(matches){const before=last.before.quantities;last.items=[...new Set([...Object.keys(before),...Object.keys(quantities)])].map(id=>{const quantity=(quantities[id]||0)-(before[id]||0),price=last.prices.items.find(p=>p.id===id);const unitE=price&&Number.isFinite(price.valueE)&&price.valueE>0?price.valueE:null;return {id,quantity,unitE,valueE:quantity===0?0:unitE==null?null:quantity*unitE};});last.valueE=last.items.some(i=>i.valueE==null)?null:last.items.reduce((n,i)=>n+i.valueE,0);last.after=snapshot;last.correctedAt=Date.now();}
+    s.baseline=snapshot;return {corrected:true,...(matches?{id:last.id}:{baselineOnly:true})};
   }
+  resetTimer(at=Date.now()){const s=this.current;if(!s)throw Error('未开始本轮');(s.timerResets??=[]).push({at,timerResetAt:s.timerResetAt,pausedMs:s.pausedMs,pausedAt:s.pausedAt});s.timerResetAt=at;s.pausedMs=0;if(s.pausedAt!=null)s.pausedAt=at;}
   resume(at = Date.now()) {const s=this.current;if(!s)throw Error('未开始本轮');if(s.pausedAt != null){s.pausedMs+=at-s.pausedAt;s.pausedAt=null;}}
   addCost(cost, at=Date.now()) {
     const s=this.current;if(!s)throw Error('未开始本轮');
@@ -71,6 +79,16 @@ class Ledger {
     const row={...clone(cost),id:randomUUID(),at,chargedE:cost.mode==='extra'?cost.quantity*cost.unitE:0};
     s.costs.push(row);return clone(row);
   }
+  addIncome(income,at=Date.now()) {
+    const s=this.current;if(!s)throw Error('请先保存一次背包，建立本轮记录');
+    const {name,quantity,unitD}=income;
+    if(typeof name!=='string'||!name.trim()||name.length>120||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitD)||unitD<0||!Number.isFinite(quantity*unitD))throw Error('请填写收入名称、有效数量和 D 单价');
+    const rateE=Number.isFinite(income.rateE)&&income.rateE>0?income.rateE:null;
+    const valueE=rateE==null?null:quantity*unitD*rateE;if(valueE!=null&&!Number.isFinite(valueE))throw Error('收入金额超出范围');
+    const row={id:randomUUID(),at,preset:income.preset,name:name.trim(),quantity,unitD,valueD:quantity*unitD,rateE,valueE};
+    (s.incomes??=[]).push(row);return clone(row);
+  }
+  deleteIncome(id){const s=this.current,index=s?.incomes?.findIndex(i=>i.id===id);if(index==null||index<0)throw Error('收入记录不存在');const [row]=s.incomes.splice(index,1);(s.deletedIncomes??=[]).push({...row,deletedAt:Date.now()});return {deleted:true};}
   openMap(preset, at=Date.now()) {
     const s=this.current;if(!s)throw Error('请先保存一次背包，建立本轮记录');
     const checkpoint=clone(s);
@@ -81,10 +99,10 @@ class Ledger {
   undoScan() {const s=this.current;const r=s?.records.pop();if(!r)throw Error('没有可撤销的扫描');s.baseline=r.before;return r;}
   summary(s=this.current,at=Date.now()) {
     if(!s) return null;
-    const ms=Math.max(0,(s.endedAt ?? s.pausedAt ?? at)-s.startedAt-s.pausedMs);
-    const partialE=s.records.reduce((n,r)=>n+(r.valueE??0),0);
+    const ms=Math.max(0,(s.endedAt ?? s.pausedAt ?? at)-(s.timerResetAt??s.startedAt)-s.pausedMs);
+    const partialE=s.records.reduce((n,r)=>n+(r.valueE??0),0)+(s.incomes||[]).reduce((n,r)=>n+(r.valueE??0),0);
     const costsE=s.costs.reduce((n,c)=>n+c.chargedE,0);
-    const netE=s.records.some(r=>r.valueE==null)?null:partialE-costsE;
+    const netE=s.records.some(r=>r.valueE==null)||(s.incomes||[]).some(i=>i.valueE==null)?null:partialE-costsE;
     return {ms,maps:s.maps,partialE,costsE,netE,averageE:netE==null||s.maps===0?null:netE/s.maps,hourlyE:netE==null || ms===0?null:netE*3600000/ms};
   }
   end(at=Date.now()) {const s=this.current;if(!s)throw Error('未开始本轮');if(s.pausedAt!=null)this.resume(at);s.endedAt=at;return clone(s);}

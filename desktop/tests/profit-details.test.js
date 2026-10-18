@@ -1,0 +1,7 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),P=require('../backpack/profit-details'),W=require('../backpack/window-mode');
+test('profit hover groups quantities with frozen weighted unit prices and separates costs',()=>{
+ const s={records:[{prices:{rateE:100},after:{rows:[{id:'a',name:'物品甲'}]},items:[{id:'a',quantity:2,valueE:200}]},{prices:{rateE:200},after:{rows:[{id:'a',name:'物品甲'}]},items:[{id:'a',quantity:3,valueE:1200},{id:'a',quantity:-1,valueE:-400}]}],incomes:[{name:'手动收入',quantity:1,valueD:5}],costs:[{name:'额外投入',quantity:2,chargedE:100,rateE:100},{name:'库存备忘',quantity:9,chargedE:0}]};
+ const r=P.calculate(s),a=r.rows.find(i=>i.kind==='output'&&i.id==='a');assert.equal(a.quantity,5);assert.equal(a.valueD,8);assert.equal(a.unitD,1.6);assert.equal(r.outputD,13);assert.equal(r.costD,3);assert(!r.rows.some(i=>i.name==='库存备忘'));assert.equal(a.name,'物品甲');
+});
+test('profit details preserve missing price instead of silently adding zero',()=>{const r=P.calculate({records:[{prices:{},items:[{id:'x',quantity:3,valueE:null}]}]});assert.equal(r.outputD,null);assert.equal(r.rows[0].quantity,3);assert.equal(r.rows[0].unitD,null);assert.equal(r.missing,1);});
+test('floating restores customized dimensions without the old mini-window caps',()=>{const d={workArea:{x:0,y:0,width:1920,height:1040}},b=W.bounds({x:100,y:120,width:650,height:260},true,[d],d);assert.equal(b.width,650);assert.equal(b.height,260);assert.equal(W.bounds({x:100,y:120,width:300,height:220},true,[d],d).height,220);});

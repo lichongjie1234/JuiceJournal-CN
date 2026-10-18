@@ -10,7 +10,8 @@
   new MutationObserver(()=>{for(const p of pickers)if(!p.input.isConnected){pickers.delete(p);p.box.remove();}}).observe(document.body,{childList:true,subtree:true});
  }
  const normalize=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
- function search(items,query,limit=12){const q=normalize(query);return items.map(item=>{const name=normalize(item.name),english=normalize(item.english),id=normalize(item.id);let score=!q?0:name===q?100:name.startsWith(q)?80:name.includes(q)?60:english.includes(q)?40:id.includes(q)?20:-1;return {item,score};}).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score||a.item.name.localeCompare(b.item.name,'zh-CN')).slice(0,limit).map(x=>x.item);}
+ const currency=item=>/^(通货|货币|currency)/i.test(item.category||String(item.id).split("\u001f")[0])||/^(Divine Orb|Exalted Orb|Chaos Orb|Orb of |Regal Orb|Alchemy Orb|Vaal Orb)/i.test(item.english||"");
+ function search(items,query,limit=12,preferCurrency=false){const q=normalize(query);return items.map(item=>{const name=normalize(item.name),english=normalize(item.english),id=normalize(item.id);let score=!q?0:name===q?100:name.startsWith(q)?80:name.includes(q)?60:english.includes(q)?40:id.includes(q)?20:-1;return {item,score};}).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score||(preferCurrency?Number(currency(b.item))-Number(currency(a.item)):0)||a.item.name.localeCompare(b.item.name,'zh-CN')).slice(0,limit).map(x=>x.item);}
  function attach(input,getItems,onSelect){
   install();
   if(input._itemPicker)return input._itemPicker;
@@ -20,7 +21,7 @@
   function close(){if(box.hidden)return;box.hidden=true;box.replaceChildren();active=-1;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');}
   function choose(index){const item=options[index];if(!item)return;input.value=item.name;input.dispatchEvent(new Event('input',{bubbles:true}));onSelect?.(item);input.focus({preventScroll:true});close();}
   function highlight(){[...box.children].forEach((node,i)=>{node.classList.toggle('active',i===active);node.setAttribute('aria-selected',String(i===active));});if(active>=0){input.setAttribute('aria-activedescendant',box.id+'-'+active);const n=box.children[active];if(n.offsetTop<box.scrollTop)box.scrollTop=n.offsetTop;else if(n.offsetTop+n.offsetHeight>box.scrollTop+box.clientHeight)box.scrollTop=n.offsetTop+n.offsetHeight-box.clientHeight;}}
-  function open(){if(!input.isConnected)return;for(const p of pickers)if(p.input!==input)p.close();options=search(getItems(),input.value);box.replaceChildren();active=-1;if(!options.length){close();return;}
+  function open(){if(!input.isConnected)return;for(const p of pickers)if(p.input!==input)p.close();options=search(getItems(),input.value,12,input.id==='costName');box.replaceChildren();active=-1;if(!options.length){close();return;}
    options.forEach((item,i)=>{const option=document.createElement('div');option.className='picker-option';option.id=box.id+'-'+i;option.setAttribute('role','option');option.textContent=item.name;option.addEventListener('pointerdown',event=>{event.preventDefault();choose(i);});box.append(option);});
    const rect=input.getBoundingClientRect();box.style.left=rect.left+'px';box.style.width=Math.max(220,rect.width)+'px';box.style.maxHeight=Math.max(90,Math.min(260,window.innerHeight-rect.bottom-12))+'px';box.style.top=(rect.bottom+4)+'px';box.hidden=false;input.setAttribute('aria-expanded','true');
   }
@@ -29,5 +30,5 @@
   pickers.add({input,box,close});
   return input._itemPicker={close,open};
  }
- const api={normalize,search,attach};if(typeof module!=='undefined')module.exports=api;else root.ItemPicker=api;
+ const api={normalize,search,currency,attach};if(typeof module!=='undefined')module.exports=api;else root.ItemPicker=api;
 })(typeof window!=='undefined'?window:globalThis);

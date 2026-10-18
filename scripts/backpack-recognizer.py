@@ -44,20 +44,26 @@ def scan(file,out,reference):
    for col in range(cols):
     b=(round(x+col*70.25),round(788+row*70.25),round(x+(col+1)*70.25),round(788+(row+1)*70.25))
     tiles.append(im.crop(b).resize((70,70)));locations.append((area,row,col))
- bank=classify(tiles)
+ empty=ref.crop((1767,789,1836,858)).resize((70,70))
+ ea=np.asarray(empty)[5:65,5:65].astype(float)
+ occupied=[i for i,tile in enumerate(tiles) if float(np.abs(np.asarray(tile)[5:65,5:65].astype(float)-ea).mean())>=7]
+ matched=classify([tiles[i] for i in occupied]) if occupied else None
+ bank=[None]*len(tiles) if matched is not None else None
+ if bank is not None:
+  for i,result in zip(occupied,matched):bank[i]=result
  # The preinstalled current-price icon library is the primary identity source.
  # Never require a separate, older user's assistant or its out-of-date catalog.
  preds=[{'status':'uncertain','item':None,'name':'','suggested_item':None,'alternatives':[],'similarity':0} for _ in tiles]
- empty=ref.crop((1767,789,1836,858)).resize((70,70))
- ea=np.asarray(empty)[5:65,5:65].astype(float)
  cells=[]
  groups=[]
+ valid=np.ones((70,70),dtype=bool);valid[:4]=False;valid[-4:]=False;valid[:,:4]=False;valid[:,-4:]=False;valid[:25,:36]=False
  for i,(tile,pred,loc) in enumerate(zip(tiles,preds,locations)):
   a=np.asarray(tile)[5:65,5:65].astype(float)
   difference=float(np.abs(a-ea).mean())
   if difference<7:
    cells.append({'index':i,'area':loc[0],'row':loc[1]+1,'col':loc[2]+1,'status':'empty','quantity':None});continue
-  tile.save(out/f'{i}.png');corner(tile,(2,2,36,25)).save(out/f'{i}-top.png');corner(tile,(34,45,69,69)).save(out/f'{i}-bottom.png')
+  top_image=corner(tile,(2,2,36,25));bottom_image=corner(tile,(34,45,69,69))
+  tile.save(out/f'{i}.png');top_image.save(out/f'{i}-top.png');bottom_image.save(out/f'{i}-bottom.png')
   corner(tile,(2,2,36,25),120).save(out/f'{i}-top-alt.png');corner(tile,(34,45,69,69),120).save(out/f'{i}-bottom-alt.png')
   # Never use the old classifier's quantity or default-one behavior.
   pixels=np.asarray(tile).astype(float)/255
@@ -73,7 +79,6 @@ def scan(file,out,reference):
     for dx in (-1,0,1):
      shifted=np.roll(reference_pixels,(dy,dx),(0,1))
      diff=np.abs(pixels-shifted).mean(2)
-     valid=np.ones((70,70),dtype=bool);valid[:4]=False;valid[-4:]=False;valid[:,:4]=False;valid[:,-4:]=False;valid[:25,:36]=False
      body=float(diff[valid].mean());badge=float(diff[45:65,43:65].mean())
      if badge<.055:best=min(best,body)
    if best<.045:group=gid;break
@@ -82,7 +87,6 @@ def scan(file,out,reference):
   if lookup:
    pred={**pred,'item':lookup['items'][0]['english'].replace(' ','_') if lookup['catalogId'] else None,'name':' / '.join(x['name'] for x in lookup['items']),
     'status':'recognized' if lookup['catalogId'] else 'ambiguous_grade' if lookup['confidentIcon'] and len(lookup['items'])>1 else 'uncertain','similarity':lookup['score']}
-  top_image=corner(tile,(2,2,36,25));bottom_image=corner(tile,(34,45,69,69))
   cells.append({'index':i,'group':group,'area':loc[0],'row':loc[1]+1,'col':loc[2]+1,'status':pred['status'],
    'item':pred['item'],'suggested_item':pred['suggested_item'],'name':pred['name'],
    'alternatives':pred['alternatives'],'similarity':pred['similarity'],'quantity':None,'confirmed':False,

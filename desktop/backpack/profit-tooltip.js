@@ -1,0 +1,4 @@
+'use strict';
+const $=id=>document.getElementById(id),api=window.tracker,n=v=>v==null?'待补价':Number(v).toLocaleString('zh-CN',{maximumSignificantDigits:6});
+function render(data){$('rows').replaceChildren();$('empty').hidden=Boolean(data.rows.length);for(const item of data.rows){const row=document.createElement('tr');row.className=item.kind;for(const value of [item.name,(item.kind==='cost'?'−':'+')+n(item.quantity),n(item.unitD),(item.kind==='cost'?'−':'')+n(item.valueD)]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}$('rows').append(row);}$('total').textContent=`累计产出 ${n(data.outputD)} D · 成本 ${n(data.costD)} D`+(data.missing?` · ${data.missing} 项待补价`:'');}
+api.onTooltipUpdate(render);api.call('getTooltip').then(render);document.documentElement.onpointerenter=()=>api.call('profitTooltip',{keep:true});document.documentElement.onpointerleave=()=>api.call('profitTooltip',{visible:false});

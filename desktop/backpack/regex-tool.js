@@ -1105,7 +1105,7 @@ window.SHITU_EQUIPMENT_TIERS = {"source":{"label":"poe2-better-trade-filter / Re
   $('preset-rename').onclick=renamePreset;
   $('preset-name').onkeydown=e=>{if(e.key==='Enter')renamePreset();};
   $('preset-delete').onclick=deletePreset;
-  $('copy').onclick=async()=>{const src=window.__shitu_lastRegex;if(!src)return;try{await options.copy(src);$('save-status').textContent=text('✓ 已复制正则','✓ 已複製正則');}catch(e){$('save-status').textContent='复制失败：'+e.message;}};render();
+  window.__shitu_capture=()=>JSON.parse(JSON.stringify(state));window.__shitu_restore=raw=>{state=restore(raw);render();};$('copy').onclick=async()=>{const src=window.__shitu_lastRegex;if(!src)return;try{await options.copy(src);$('save-status').textContent=text('✓ 已复制正则','✓ 已複製正則');}catch(e){$('save-status').textContent='复制失败：'+e.message;}};render();
 })();
 
 
@@ -1114,6 +1114,7 @@ window.SHITU_EQUIPMENT_TIERS = {"source":{"label":"poe2-better-trade-filter / Re
 
 
 
+globalThis.RegexHistory.attach({root,storage:localStorage,copy:options.copy,confirm:askConfirm,getSource:()=>window.__shitu_lastRegex,getSnapshot:()=>window.__shitu_capture(),restoreSnapshot:raw=>window.__shitu_restore(raw)});
 root.addEventListener('click',e=>{const link=e.target.closest('a[href]');if(link){e.preventDefault();if(link.href.startsWith('https://'))options.open(link.href);}});
 host._regex={root,engine:window.SHITU_REGEX,data:window.SHITU_DATA,equipment:window.SHITU_EQUIPMENT};
 }
