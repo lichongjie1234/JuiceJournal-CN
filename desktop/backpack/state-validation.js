@@ -1,0 +1,34 @@
+ 'use strict';
+const Memory=require('./recognition-memory'),Pending=require('./pending-scans'),Market=require('./market'),Monitor=require('./market-monitor'),View=require('./view-state'),Daily=require('./daily-summary'),Profit=require('./profit-details'),{Ledger}=require('../cn/ledger');
+const object=x=>x&&typeof x==='object'&&!Array.isArray(x),text=x=>typeof x==='string'&&x.trim().length>0,number=x=>typeof x==='number'&&Number.isFinite(x),integer=x=>Number.isSafeInteger(x),assert=(ok,message)=>{if(!ok)throw Error('备份数据无效：'+message);};
+function optionalNumber(x,name,min=-Infinity){if(x!=null)assert(number(x)&&x>=min,name);}
+function time(x,name){assert(number(x)&&x>=0,name);}
+function unique(rows,name){const ids=rows.map(x=>x?.id);assert(ids.every(text)&&new Set(ids).size===ids.length,name+' ID');}
+function prices(p){assert(object(p)&&Array.isArray(p.items),'价格快照');optionalNumber(p.rateE,'汇率',Number.MIN_VALUE);for(const i of p.items){assert(object(i)&&text(i.id),'价格物品');optionalNumber(i.valueE,'价格',0);}}
+function cells(rows){assert(Array.isArray(rows),'物品格');for(const c of rows){assert(object(c),'物品格内容');if(c.quantity!=null)assert(integer(c.quantity)&&c.quantity>=0,'物品数量');if(c.name!=null)assert(typeof c.name==='string','物品名称');}}
+function snapshot(s,scope,season){assert(object(s)&&text(s.screenshot)&&text(s.imageHash),'库存快照或证据路径');assert(s.scope===scope&&s.season===season,'快照统计范围或赛季');time(s.at,'快照时间');assert(object(s.quantities)&&Array.isArray(s.rows),'库存数量表');for(const q of Object.values(s.quantities))assert(integer(q)&&q>=0,'库存数量');cells(s.rows);if(s.allRows)cells(s.allRows);if(s.cells)cells(s.cells);}
+function validate(state){
+ assert(state?.schema===2&&state.ledger?.schema===1&&Array.isArray(state.ledger.sessions),'版本或账本');
+ for(const k of ['settings','presets','learned','manual'])assert(object(state[k]),k);
+ for(const k of ['audit','undo','exclusions','visualRules'])assert(state[k]===undefined||Array.isArray(state[k]),k);
+ for(const key of ['bounds','miniBounds','floatingBounds','floatingWorkArea']){const b=state.settings[key];if(b!=null)assert(object(b)&&['x','y','width','height'].every(k=>number(b[k]))&&b.width>0&&b.height>0,'窗口坐标');}
+ for(const key of ['pin','miniPin','miniHighContrast','floatingVisible'])if(state.settings[key]!=null)assert(typeof state.settings[key]==='boolean','窗口开关');optionalNumber(state.settings.miniOpacity,'窗口透明度',0);if(state.settings.miniTextColor!=null)assert(/^#[0-9a-f]{6}$/i.test(state.settings.miniTextColor),'文字颜色');if(state.settings.windowTitle!=null)assert(text(state.settings.windowTitle),'游戏窗口名称');
+ if(state.trackedIds!=null)assert(Array.isArray(state.trackedIds)&&state.trackedIds.every(text)&&new Set(state.trackedIds).size===state.trackedIds.length,'统计清单');
+ for(const key of ['learned','exactReviewed'])if(state[key]!=null){assert(object(state[key]),'识别记忆');for(const c of Object.values(state[key])){assert(object(c)&&(c.id==null||typeof c.id==='string')&&(c.name==null||typeof c.name==='string'),'识别记忆条目');if(c.quantity!=null)assert(integer(c.quantity)&&c.quantity>=0,'识别记忆数量');}}
+ for(const rule of [...(state.visualRules||[]),...(state.exclusions||[])])assert(object(rule)&&Array.isArray(rule.signature)&&rule.signature.every(number)&&(rule.badge==null||Array.isArray(rule.badge)&&rule.badge.every(number))&&(rule.name==null||typeof rule.name==='string'),'图标规则');
+ for(const p of Object.values(state.manual)){assert(object(p)&&number(p.valueE)&&p.valueE>0,'手动价格');time(p.at,'手动价格时间');}
+ Memory.list(state);
+ const sessions=state.ledger.sessions;unique(sessions,'轮次');assert(sessions.filter(s=>s.endedAt==null).length<=1,'存在多个未结束轮次');
+ for(const s of sessions){
+  assert(text(s.scope)&&text(s.season),'轮次范围或赛季');time(s.startedAt,'开始时间');optionalNumber(s.endedAt,'结束时间',s.startedAt);optionalNumber(s.pausedAt,'暂停时间',s.startedAt);optionalNumber(s.timerResetAt,'重置时间',s.startedAt);assert(number(s.pausedMs)&&s.pausedMs>=0,'暂停时长');assert(integer(s.maps)&&s.maps>=0,'图数');assert(Array.isArray(s.records)&&Array.isArray(s.costs),'收支列表');snapshot(s.baseline,s.scope,s.season);unique(s.records,'库存变化');
+  for(const r of s.records){time(r.at,'记录时间');assert(Array.isArray(r.items),'库存变化缺少物品明细');prices(r.prices);assert(r.prices.season==null||r.prices.season===s.season,'历史价格赛季');snapshot(r.before,s.scope,s.season);snapshot(r.after,s.scope,s.season);const ids=new Set();let total=0,unknown=false;for(const i of r.items){assert(object(i)&&text(i.id)&&!ids.has(i.id)&&integer(i.quantity),'库存变化物品');ids.add(i.id);assert(i.unitE===null||number(i.unitE)&&i.unitE>=0,'库存变化单价');assert(i.valueE===null||number(i.valueE),'库存变化金额');if(i.valueE===null)unknown=true;else{total+=i.valueE;if(i.unitE!=null)assert(Math.abs(i.valueE-i.quantity*i.unitE)<=1e-7*Math.max(1,Math.abs(i.valueE)),'物品金额与数量不一致');}}assert(r.valueE===null||number(r.valueE),'库存变化合计');assert(unknown?r.valueE===null:r.valueE!==null&&Math.abs(total-r.valueE)<=1e-7*Math.max(1,Math.abs(total)),'库存变化合计不一致');}
+  unique(s.costs,'成本');for(const c of s.costs){time(c.at,'成本时间');assert(['extra','inventory'].includes(c.mode)&&number(c.quantity)&&c.quantity>0&&number(c.unitE)&&c.unitE>=0&&number(c.chargedE)&&c.chargedE>=0,'成本金额或数量');optionalNumber(c.rateE,'成本汇率',Number.MIN_VALUE);const expected=c.mode==='inventory'?0:c.quantity*c.unitE;assert(Math.abs(expected-c.chargedE)<=1e-7*Math.max(1,expected),'成本合计不一致');}
+  if(s.incomes!=null){assert(Array.isArray(s.incomes),'额外收入');unique(s.incomes,'收入');for(const i of s.incomes){time(i.at,'收入时间');assert(text(i.name)&&number(i.quantity)&&i.quantity>0&&number(i.unitD)&&i.unitD>=0&&number(i.valueD)&&Math.abs(i.valueD-i.quantity*i.unitD)<=1e-7*Math.max(1,i.valueD),'额外收入金额');optionalNumber(i.rateE,'收入汇率',Number.MIN_VALUE);optionalNumber(i.valueE,'收入E金额',0);}}
+ }
+ if(state.draft){const d=state.draft;assert(object(d)&&text(d.scope)&&text(d.screenshot)&&text(d.imageHash),'扫描草稿');time(d.at,'扫描时间');cells(d.cells);prices(d.prices);}
+ Pending.validate(state);Market.validate(state.market);Monitor.validate(state.marketMonitor);
+ // Exercise the actual read paths before replacing any live state.
+ const projected=sessions.map(View.session);Daily.summarize(projected);for(const s of projected){Ledger.prototype.summary.call(null,s,s.endedAt??s.startedAt);Profit.calculate(s);}
+ return state;
+}
+module.exports={validate};

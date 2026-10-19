@@ -17,6 +17,7 @@ function create({BrowserWindow,screen,directory,settings,getView,changed,closed,
   })();try{return await loading;}finally{loading=null;restoring=false;}
  }
  async function show(){const w=await ensure();settings().floatingVisible=true;w.showInactive();changed();return w;}
+ async function applySettings(){if(!alive(mini))return;if(loading)await loading;const displays=screen.getAllDisplays(),primary=screen.getPrimaryDisplay(),preferred=displays.find(d=>d.id===settings().floatingDisplayId),fallback=preferred||displays.find(d=>d.id!==primary.id)||primary;let saved=settings().floatingBounds||settings().miniBounds;const old=settings().floatingWorkArea;if(saved&&preferred&&old)saved={...saved,x:saved.x+preferred.workArea.x-old.x,y:saved.y+preferred.workArea.y-old.y};restoring=true;try{mini.setBounds(W.bounds(saved,true,displays,fallback));appearance();}finally{restoring=false;}remember();changed();}
  function hide(){if(alive(mini)){remember();mini.hide();}settings().floatingVisible=false;hideTooltip();changed();}
  function broadcast(){if(alive(mini))mini.webContents.send('tracker:float',getView());if(alive(tooltip)&&tooltip.isVisible())tooltip.webContents.send('tracker:tooltip',getView().details);}
  function hideTooltip(delay=0){wanted=false;clearTimeout(hideTimer);if(delay)hideTimer=setTimeout(()=>{if(!wanted&&alive(tooltip))tooltip.hide();},delay);else if(alive(tooltip))tooltip.hide();}
@@ -30,6 +31,6 @@ function create({BrowserWindow,screen,directory,settings,getView,changed,closed,
   tooltip.setBounds({x:Math.max(area.x,Math.min(cursor.x+14,area.x+area.width-width)),y:Math.max(area.y,Math.min(cursor.y+16,area.y+area.height-height)),width,height});tooltip.webContents.send('tracker:tooltip',details);tooltip.showInactive();
  }
  function destroy(){clearTimeout(hideTimer);if(alive(tooltip))tooltip.destroy();if(alive(mini))mini.destroy();}
- return{show,hide,broadcast,appearance,remember,hover,hideTooltip,destroy,isVisible:()=>alive(mini)&&mini.isVisible(),get window(){return mini;},get tooltip(){return tooltip;}};
+ return{show,hide,applySettings,broadcast,appearance,remember,hover,hideTooltip,destroy,isVisible:()=>alive(mini)&&mini.isVisible(),get window(){return mini;},get tooltip(){return tooltip;}};
 }
 module.exports={create};

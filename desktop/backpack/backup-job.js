@@ -1,0 +1,7 @@
+ 'use strict';
+const {Worker,isMainThread,parentPort,workerData}=require('node:worker_threads');
+const active=new Set();
+function run(operation,input){return new Promise((resolve,reject)=>{const worker=new Worker(__filename,{workerData:{backupJob:true,operation,input}});active.add(worker);let settled=false;const finish=(error,result)=>{if(settled)return;settled=true;active.delete(worker);error?reject(error):resolve(result);};worker.once('message',message=>finish(message.ok?null:Error(message.error),message.result));worker.once('error',error=>finish(error));worker.once('exit',code=>{if(!settled)finish(Error('备份任务已终止（'+code+'）'));});});}
+function stop(){for(const worker of active)void worker.terminate();active.clear();}
+if(!isMainThread&&workerData?.backupJob){try{const fs=require('node:fs'),Backup=require('./backup'),{validate}=require('./state-validation'),{operation,input}=workerData;let result;if(operation==='export'){const state=JSON.parse(fs.readFileSync(input.source,'utf8'));state.settings={...state.settings,...input.settings};validate(state);result=Backup.write(input.file,state,{directory:input.directory});}else if(operation==='restore'){const warnings=[],state=Backup.read(input.file,validate,{directory:input.directory,onWarning:message=>warnings.push(message)});result={state,warnings};}else throw Error('未知备份任务');parentPort.postMessage({ok:true,result});}catch(error){parentPort.postMessage({ok:false,error:error.message});}}
+module.exports={run,stop};

@@ -11,7 +11,7 @@ function clock(ms){const sec=Math.floor(Math.max(0,ms)/1000);return [Math.floor(
 function closePickers(){document.querySelectorAll('[role="combobox"]').forEach(n=>n._itemPicker?.close());}
 function attachPicker(input){return ItemPicker.attach(input,()=>state?.catalog||[]);}
 function activeTab(name){closePickers();for(const n of document.querySelectorAll('.tab'))n.classList.toggle('active',n.id===name);for(const n of document.querySelectorAll('nav button'))n.classList.toggle('active',n.dataset.tab===name);if(name==='regex'&&state){try{RegexTool.mount({storage:state.regexStorage,save:value=>api.call('regexStorage',value),copy:value=>api.call('copyRegex',value),open:value=>call('openSource',value),error:text=>Workflow.feedback('正则方案保存失败：'+text,true)});}catch(e){Workflow.feedback('正则工具未能加载：'+e.message,true);}}}
-async function call(action,p){try{if(action==='export')await RegexTool.flush();const next=await api.call(action,p);if(next?.windowSettings){applyWindowSettings(next.windowSettings);return state;}if(next?.settings)render(next);if(next?.settings&&['end','editLatest','deleteRecord','clearRecords','tracked','pause','map','mapMinus','income','deleteIncome','resetTimer','undo'].includes(action))Workflow.feedback(next.message);return next;}catch(e){Workflow.feedback(e.message.replace(/^Error invoking remote method '[^']+': Error: /,''),true);}}
+async function call(action,p){try{if(action==='export'){await RegexTool.flush();await flushDraft();}const next=await api.call(action,p);if(next?.windowSettings){applyWindowSettings(next.windowSettings);return state;}if(next?.settings)render(next);if(next?.settings&&['end','editLatest','deleteRecord','clearRecords','tracked','pause','map','mapMinus','income','deleteIncome','resetTimer','undo'].includes(action))Workflow.feedback(next.message);return next;}catch(e){Workflow.feedback(e.message.replace(/^Error invoking remote method '[^']+': Error: /,''),true);}}
 function applyWindowSettings(settings){if(!state)return;if(JSON.stringify(state.settings)===JSON.stringify(settings))return;Object.assign(state.settings,settings);$('pin').checked=settings.pin;MiniPanel.render(state);}
 function itemForName(name){const query=ItemPicker.normalize(name);return state.catalog.find(i=>ItemPicker.normalize(i.name)===query||i.id===name);}
 function identity(name){if(!name.trim())return {id:'',name:''};const item=itemForName(name);return item?{id:item.id,name:item.name}:{id:'custom:'+name.trim(),name:name.trim()};}
@@ -107,10 +107,10 @@ function refreshChecks(){
  $('commit').hidden=!state?.draft?.editingBaseline;$('commit').disabled=!state?.draft||state.busy||pending>0||state.draft.needsDecreaseDecision;
  if(state?.draft)$('reviewInfo').textContent=`已识别 ${review.length-pending} 格 · 待补全 ${pending} 格 · 数量估算 ${review.filter(ScanAudit.estimated).length} 格`;
 }
-let draftSaveTimer;
+let draftSaveTimer,draftDirty=false;
 let draftSavePromise=Promise.resolve();
-function flushDraft(){clearTimeout(draftSaveTimer);if(!state?.draft||review._hash!==state.draft.imageHash)return draftSavePromise;const payload={hash:review._hash,cells:structuredClone(review)};draftSavePromise=draftSavePromise.then(()=>call('draftEdit',payload));return draftSavePromise;}
-function saveDraftSoon(){clearTimeout(draftSaveTimer);draftSaveTimer=setTimeout(flushDraft,250);}
+function flushDraft(){clearTimeout(draftSaveTimer);if(!draftDirty||!state?.draft||review._hash!==state.draft.imageHash)return draftSavePromise;draftDirty=false;const payload={hash:review._hash,cells:structuredClone(review)};draftSavePromise=draftSavePromise.then(async()=>{const result=await call('draftEdit',payload);if(!result&&state?.draft?.imageHash===payload.hash)draftDirty=true;return result;});return draftSavePromise;}
+function saveDraftSoon(){draftDirty=true;clearTimeout(draftSaveTimer);draftSaveTimer=setTimeout(flushDraft,250);}
 async function saveReviewed(){
  if(state?.draft?.needsDecreaseDecision){activeTab('review');$('reviewError').textContent='请选择本次保存方式，再入账。';return;}
  clearTimeout(draftSaveTimer);await draftSavePromise;const invalid=review.find(c=>!c.confirmed||(!c.excluded&&!c.notTracked&&(!c.id||!Number.isSafeInteger(c.quantity)||c.quantity<0)));

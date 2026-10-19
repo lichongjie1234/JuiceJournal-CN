@@ -15,4 +15,7 @@ function apply(win,settings,mini,displays,fallback,saveCurrent=true){
  if(mini)win.setMinimumSize(280,210);win.setBounds(target);if(!mini)win.setMinimumSize(780,620);
  win.setOpacity(mini?opacity(settings.miniOpacity??1):1);win.setAlwaysOnTop(Boolean(settings[mini?'miniPin':'pin']));
 }
-module.exports={opacity,bounds,remember,apply};
+const floatingKeys=['floatingBounds','floatingDisplayId','floatingWorkArea','floatingVisible'];
+function floatingSnapshot(settings){return Object.fromEntries(floatingKeys.filter(k=>settings[k]!==undefined).map(k=>[k,structuredClone(settings[k])]));}
+function restoreFloating(settings,saved){const b=saved?.floatingBounds,a=saved?.floatingWorkArea;if(!b||!['x','y','width','height'].every(k=>Number.isFinite(b[k]))||b.width<280||b.height<210||a&&!['x','y','width','height'].every(k=>Number.isFinite(a[k]))||saved.floatingVisible!==undefined&&typeof saved.floatingVisible!=='boolean')return false;Object.assign(settings,floatingSnapshot(saved));return true;}
+module.exports={opacity,bounds,remember,apply,floatingSnapshot,restoreFloating};
