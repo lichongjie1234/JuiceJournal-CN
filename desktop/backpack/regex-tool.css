@@ -302,3 +302,5 @@ footer .credit{white-space:nowrap}
 
 /* Shared desktop palette; no additional UI dependency. */
 :host{--bg:#0f141b;--card:#171f29;--line:#2a3543;--ink:#e6edf5;--sub:#9aaabd;--input:#111b26;--green:#87d9bd;--green-d:#63b99b;--radius:9px;--radius-s:6px}.app{font-size:12px}.app .panel{background:var(--card);border-color:var(--line);border-radius:9px;box-shadow:none}.app button,.app input,.app select{border-radius:6px;box-shadow:none}.app .toolbar{padding:8px 0 12px}.app .brand{font-size:14px}.app h2{font-size:13px}.quick-copy .regex-box{background:#111b26}.quick-copy .regex-source{background:#192936;color:#a3e5cb}.history-entry{background:#121e29}.app .tabs button[aria-pressed=true]{background:#23392f;color:#b1ead5}.app input:focus-visible,.app select:focus-visible,.app button:focus-visible{outline:2px solid #87d9bd;outline-offset:2px}
+
+.item-inspector{margin:8px 0;padding:10px 14px}.item-inspector textarea{display:block;box-sizing:border-box;width:100%;margin-top:10px;color:inherit;background:var(--surface,#182329);border:1px solid #34494f;border-radius:6px;padding:8px;resize:vertical}.item-inspector p{margin:6px 0 0}

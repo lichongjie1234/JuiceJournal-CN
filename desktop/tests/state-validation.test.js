@@ -6,3 +6,6 @@ test('rejects duplicate active sessions and invalid costs',()=>{const s=fixture(
 test('rejects invalid settings and recognition memory before window application',()=>{const s=fixture();s.settings.miniOpacity='bad';assert.throws(()=>validate(s),/透明度/);delete s.settings.miniOpacity;s.learned.bad=null;assert.throws(()=>validate(s),/识别记忆/);});
 
 test('legacy optional root collections can be supplied by defaults without rewriting history',()=>{const s=fixture();delete s.visualRules;delete s.exclusions;delete s.audit;delete s.undo;validate(s);assert.equal(s.visualRules,undefined);});
+
+test('rejects inconsistent snapshot totals and omitted changes',()=>{const s=JSON.parse(JSON.stringify(fixture()));s.ledger.sessions[0].baseline.quantities.orb=999;assert.throws(()=>validate(s),/快照明细/);const other=fixture();other.ledger.sessions[0].records[0].items=[];assert.throws(()=>validate(other),/遗漏物品/);});
+test('rejects internally priced changes inconsistent with their evidence',()=>{const s=fixture(),r=s.ledger.sessions[0].records[0];r.items[0].quantity=5;r.items[0].valueE=10;r.valueE=10;assert.throws(()=>validate(s),/快照数量差/);});

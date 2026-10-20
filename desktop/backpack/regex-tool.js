@@ -1001,12 +1001,21 @@ window.SHITU_EQUIPMENT_TIERS = {"source":{"label":"poe2-better-trade-filter / Re
     advice.textContent=text('请清除数值限制、减少词缀或调整满足条数。','請清除數值限制、減少詞綴或調整滿足條數。');
     p.replaceChildren(document.createTextNode(prefix),advice);
   }
+  let exclusionChecks=[];
+  const inspectPanel=document.createElement('details');inspectPanel.className='panel item-inspector';
+  const inspectTitle=document.createElement('summary');inspectTitle.textContent='检查物品是否命中排除词缀';
+  const inspectText=document.createElement('textarea');inspectText.rows=3;inspectText.maxLength=20000;inspectText.placeholder='在游戏中手动 Ctrl+C 复制物品文字，粘贴到这里';
+  const inspectResult=document.createElement('p');inspectResult.className='secondary';inspectResult.setAttribute('role','status');
+  inspectPanel.append(inspectTitle,inspectText,inspectResult);document.querySelector('.toolbar').after(inspectPanel);
+  function inspectItem(){const source=inspectText.value.trim();if(!source){inspectResult.textContent='仅检查当前已选排除条件；不读取游戏数据，不判断你的 BD 是否安全。';return;}if(!exclusionChecks.length&&!Object.values(page().selected).some(s=>s.mode==='exclude')){inspectResult.textContent='当前没有可检查的排除条件，请先选择需要排除的词缀。';return;}const hits=[],unknown=Object.entries(page().selected).filter(([id,s])=>s.mode==='exclude').map(([id])=>allAffixes().find(a=>a.id===id)).filter(Boolean).map(nameOf).filter(label=>!exclusionChecks.some(c=>c.label===label));for(const c of exclusionChecks){try{if(new RegExp(c.pattern,'im').test(source))hits.push(c.label);}catch{unknown.push(c.label);}}inspectResult.textContent=(hits.length?'命中排除：'+hits.join('；'):'未命中当前排除条件（不代表地图安全）')+(unknown.length?'；以下条件无法核实：'+unknown.join('；'):'');}
+  inspectText.oninput=inspectItem;inspectItem();
   function regexPreview(){
+    exclusionChecks=[];
     const R=window.SHITU_REGEX;if(!R){$('regex-pending').textContent=text('正则引擎未加载。','正則引擎未載入。');$('copy').disabled=true;return;}
     const p=page(),inc=[],incSides=[],exc=[],unready=[],errors=validationErrors();
     if(errors.length){$('regex-source').textContent='';$('regex-pending').textContent=errors.join('；');$('copy').disabled=true;window.__shitu_lastRegex='';return;}
     const addPattern=(pattern,affix,selected)=>{
-      if(selected.mode==='exclude')exc.push(pattern);
+      if(selected.mode==='exclude'){exc.push(pattern);exclusionChecks.push({pattern,label:nameOf(affix)});}
       else{inc.push(pattern);incSides.push(affix.side);}
     };
     /* 基础条件始终 AND；至少满足 N 条只计算包含词缀。 */
@@ -1070,7 +1079,7 @@ window.SHITU_EQUIPMENT_TIERS = {"source":{"label":"poe2-better-trade-filter / Re
     const count=match==='any'?1:Number(match.slice(-1));
     return match==='all'?text('满足全部','滿足全部'):text('至少满足'+count+'条','至少滿足'+count+'條');
   }
-  function renderSummary(){const items=conditions();$('summary').innerHTML=items.length?`<div class="summary-items">${items.map(c=>`<div class="condition ${c.excluded?'excluded':''}"><span>${escape(c.label)}</span><button type="button" data-remove="${c.key}" aria-label="${text('移除')} ${escape(c.label)}">×</button></div>`).join('')}</div>`:`<div class="empty"><strong>${text('还没有筛选条件','尚未設定篩選條件')}</strong>${text('填写数值，或选择需要的词缀。','填寫數值，或選擇需要的詞綴。')}</div>`;$('condition-count').textContent=items.length;$('clear').disabled=!items.length;$('summary-rule').textContent=items.length?text('包含词缀：','包含詞綴：')+matchLabel(page().match):'';regexPreview();save();renderPresets();}
+  function renderSummary(){const items=conditions();$('summary').innerHTML=items.length?`<div class="summary-items">${items.map(c=>`<div class="condition ${c.excluded?'excluded':''}"><span>${escape(c.label)}</span><button type="button" data-remove="${c.key}" aria-label="${text('移除')} ${escape(c.label)}">×</button></div>`).join('')}</div>`:`<div class="empty"><strong>${text('还没有筛选条件','尚未設定篩選條件')}</strong>${text('填写数值，或选择需要的词缀。','填寫數值，或選擇需要的詞綴。')}</div>`;$('condition-count').textContent=items.length;$('clear').disabled=!items.length;$('summary-rule').textContent=items.length?text('包含词缀：','包含詞綴：')+matchLabel(page().match):'';regexPreview();inspectItem();save();renderPresets();}
   function render(){
     document.documentElement.lang=state.language==='tw'?'zh-Hant':'zh-CN';
     const strings={'search-label':text('搜索词缀','搜尋詞綴'),'affix-heading':text('词缀筛选','詞綴篩選'),'result-heading':text('已选条件','已選條件'),'match-label':text('包含条件','包含條件'),'regex-heading':text('正则预览','正則預覽'),'regex-pending':text('还没有筛选条件。','尚未設定篩選條件。'),'copy':text('复制正则','複製正則'),'clear':text('清空当前条件','清空目前條件'),'clear-selected':text('清空选中词缀','清空已選詞綴'),'footer-label':text('拾图 · 本地试用版 0.13.5','拾圖 · 本機試用版 0.13.5'),'footer-note':text('方案保存在本机，随程序备份','方案儲存在本機，隨程式備份')};Object.entries(strings).forEach(([id,v])=>$(id).textContent=v);document.querySelector('.author-tag').textContent=text('关注「抖音胡说两句」，第一时间获取工具后续版本更新','關注「抖音胡說兩句」，第一時間取得工具後續版本更新');document.querySelector('.brand').setAttribute('aria-label',text('拾图首页','拾圖首頁'));document.querySelector('.tabs').setAttribute('aria-label',text('物品类型','物品類型'));document.querySelector('.language .sr-only').textContent=text('界面语言','介面語言');$('primary-panel').setAttribute('aria-label',text('基础筛选','基礎篩選'));

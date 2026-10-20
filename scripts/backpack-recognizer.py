@@ -69,11 +69,14 @@ def scan(file,out,reference):
   pixels=np.asarray(tile).astype(float)/255
   identity=np.asarray(tile.resize((20,20))).copy();identity[:7,:11]=0;identity[13:,11:]=0
   badge_features=np.asarray(tile.crop((43,45,65,65)).resize((8,8)))
+  lookup=bank[i] if bank else None
+  family=frozenset(x['id'] for x in lookup['items']) if lookup and lookup['confidentIcon'] else None
   group=None
   # Group repeated icons while retaining the lower-right level badge. Only
   # upper-left stack text is masked. Every candidate must match the first
   # member, preventing similarity chains from merging different grades.
-  for gid,reference_pixels in groups:
+  for gid,reference_pixels,reference_family in groups:
+   if family and reference_family and family!=reference_family:continue
    best=1
    for dy in (-1,0,1):
     for dx in (-1,0,1):
@@ -82,7 +85,7 @@ def scan(file,out,reference):
      body=float(diff[valid].mean());badge=float(diff[45:65,43:65].mean())
      if badge<.055:best=min(best,body)
    if best<.045:group=gid;break
-  if group is None:group=len(groups);groups.append((group,pixels))
+  if group is None:group=len(groups);groups.append((group,pixels,family))
   lookup=bank[i] if bank else None
   if lookup:
    pred={**pred,'item':lookup['items'][0]['english'].replace(' ','_') if lookup['catalogId'] else None,'name':' / '.join(x['name'] for x in lookup['items']),

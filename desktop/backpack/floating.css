@@ -2,3 +2,5 @@
 #appearance:not([open])>.settings{display:none}
 
 .market-alert-line.has-alert{background:#ffe5a3;color:#241600;border:1px solid #ffc14d;border-radius:5px;padding:5px 6px;margin:1px 0 6px;text-shadow:none}.market-alert-line.has-alert>span{opacity:1;font-weight:700}.market-alert-line.has-alert b{font-weight:700}body.contrast .market-alert-line.has-alert button,.market-alert-line.has-alert button{background:#483000;color:#fff3ce;border-color:#765200;text-shadow:none}.fresh-alert{animation:alert-glow 1.2s ease-in-out 6}@keyframes alert-glow{50%{box-shadow:0 0 0 2px #ffcc66,0 0 10px #ffb62c88}}@media(prefers-reduced-motion:reduce){.fresh-alert{animation:none}}
+
+.market-alert-line[hidden]{display:none}
