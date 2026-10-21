@@ -1,12 +1,12 @@
 (function(global){
- 'use strict';
+ 'use strict';const P=typeof module!=='undefined'?require('./record-prices'):global.RecordPrices;
  const day=at=>Number.isFinite(at)?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(at)):'';
  const types={inventory:'库存变化',income:'意外收入',cost:'额外成本',memo:'库存成本备忘'};
  function flatten(sessions,catalog=[]){
   const names=new Map(catalog.map(i=>[i.id,i.name])),rows=[];
   for(const s of sessions){
    const add=(r,type,entry,record)=>rows.push({...r,type,typeName:types[type],at:entry.at??record?.at??s.startedAt,sessionId:s.id,sessionStart:s.startedAt,status:s.endedAt?'ended':'current',season:s.season||'未记录',entryId:entry.id,recordId:record?.id,day:day(entry.at??record?.at??s.startedAt)});
-   for(const r of s.records||[])for(const i of r.items||[]){if(!i.quantity)continue;const saved=[...(r.after?.allRows||r.after?.rows||[]),...(r.before?.allRows||r.before?.rows||[])].find(x=>x.id===i.id),name=saved?.name||i.name||names.get(i.id)||i.id.replace(/^custom:/,'');const unitD=i.unitE!=null&&r.prices?.rateE>0?i.unitE/r.prices.rateE:null,valueD=i.valueE===0?0:i.valueE!=null&&r.prices?.rateE>0?i.valueE/r.prices.rateE:null;add({itemId:i.id,name,quantity:i.quantity,unitD,valueD,before:r.before?.quantities?.[i.id]??null,after:r.after?.quantities?.[i.id]??null,priceAt:r.prices?.at,basis:r.prices?.basis||'历史价格快照'},'inventory',r,r);}
+   for(const r of s.records||[])for(const i of r.items||[]){if(!i.quantity)continue;const saved=[...(r.after?.allRows||r.after?.rows||[]),...(r.before?.allRows||r.before?.rows||[])].find(x=>x.id===i.id),name=saved?.name||i.name||names.get(i.id)||i.id.replace(/^custom:/,'');const unitD=P.unitD(i,r.prices?.rateE),valueD=P.valueD(i,r.prices?.rateE);add({itemId:i.id,name,quantity:i.quantity,unitD,valueD,before:r.before?.quantities?.[i.id]??null,after:r.after?.quantities?.[i.id]??null,priceAt:r.prices?.at,basis:r.prices?.basis||'历史价格快照'},'inventory',r,r);}
    for(const i of s.incomes||[])add({itemId:catalog.find(x=>x.name===i.name)?.id||'custom:'+i.name,name:i.name,quantity:i.quantity,unitD:i.unitD,valueD:i.valueD,basis:'手动 D 单价'},'income',i);
    for(const c of s.costs||[]){const memo=c.mode==='inventory',unitD=c.unitE!=null&&c.rateE>0?c.unitE/c.rateE:null,valueD=memo?0:c.chargedE===0?0:c.chargedE!=null&&c.rateE>0?-c.chargedE/c.rateE:null;add({itemId:catalog.find(i=>i.name===c.name)?.id||'custom:'+(c.name||c.id),name:c.name||names.get(c.id)||'临时支出',quantity:-c.quantity,unitD,valueD,basis:memo?'已由库存变化计费，此处不重复扣除':c.source||'记录时单价'},memo?'memo':'cost',c);}
   }

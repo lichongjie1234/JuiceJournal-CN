@@ -1,0 +1,3 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),A=require('../backpack/auto-tracking');
+test('threshold is inclusive and unknown prices preserve prior membership',()=>{assert.deepEqual(A.select(['cheap','missing','custom'],[{id:'edge',unitD:.1},{id:'expensive',unitD:2},{id:'cheap',unitD:.099},{id:'missing',unitD:null},{id:'not-chosen',unitD:null}]),['missing','custom','edge','expensive']);});
+test('first automatic selection narrows all-item scope while preserving unpriced baseline identities',()=>{assert.deepEqual(A.select(null,[{id:'low',unitD:0},{id:'high',unitD:.1},{id:'missing',unitD:null}],['old-custom']),['high','missing','old-custom']);assert.equal(A.select(null,[{id:'unknown',unitD:null}]),null);});

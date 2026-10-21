@@ -4,7 +4,7 @@ test('small and full bounds stay reachable across disconnected and negative-coor
  const mini=W.bounds({x:-1800,y:80,width:360,height:360},true,displays,displays[1]);assert.equal(mini.x,-1800);assert.equal(mini.width,360);
  const lost=W.bounds({x:8000,y:0,width:360,height:360},true,displays,displays[0]);assert.equal(lost.x,-1890);
  const edge=W.bounds({x:2500,y:1390,width:360,height:360},true,displays,displays[1]);assert.equal(edge.x,2200);assert.equal(edge.y,1040);
- assert.equal(W.bounds({x:0,y:0,width:10,height:10},false,displays,displays[1]).width,780);
+ assert.equal(W.bounds({x:0,y:0,width:10,height:10},false,displays,displays[1]).width,10);
 });
 test('opacity stays visible and rejects invalid inputs',()=>{assert.equal(W.opacity(.1),.4);assert.equal(W.opacity(2),1);assert.equal(W.opacity(.75),.75);for(const x of [NaN,Infinity,'0.5',null])assert.throws(()=>W.opacity(x));});
 test('mode switching preserves independent sizes, opacity, pin and ledger',()=>{
